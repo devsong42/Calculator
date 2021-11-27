@@ -7,6 +7,7 @@ using namespace std;
 
 struct Num { // 大数
 	vector<int> n; // 用数组存储
+	bool sign = 1; // 符号，1 正，0 负
 	void cz(Num& x) { // control zero 控制 0 的数量
 		while (x.n.back() == 0 && x.n.size() > 1)
 			x.n.pop_back();
@@ -14,11 +15,18 @@ struct Num { // 大数
 
 	// 构造函数
 	Num(string num) {
+		if (num[0] == '+' || num[0] == '-') {
+			if (num[0] == '-')
+				sign = !sign;
+			num.erase(num.begin());
+		}
 		for (size_t i = num.size(); i > 0; --i)
 			n.push_back(num[i - 1] - '0');
 		cz(*this);
 	}
 	Num(int num) {
+		if (num < 0)
+			sign = 0, num = -num;
 		if (!num)
 			n.push_back(0);
 		while (num) {
@@ -31,48 +39,83 @@ struct Num { // 大数
 	bool operator<=(Num b) { // 重载 <=
 		bool flag = true;
 		Num a = *this;
-		if (a.n.size() != b.n.size())
-			flag = a.n.size() < b.n.size();
+		if (!(a.sign ^ b.sign)) { // 如果符号相同
+			if (!a.sign)
+				flag = false;
+			if (a.n.size() != b.n.size())
+				flag = a.n.size() < b.n.size();
+			else
+				for (size_t i = a.n.size(); i > 0; i--)
+					if (a[i - 1] == b[i - 1])
+						continue;
+					else {
+						bool tmp = a[i - 1] < b[i - 1];
+						flag = flag ? tmp : !tmp;
+						break;
+					}
+		}
 		else
-			for (size_t i = a.n.size(); i > 0; i--)
-				if (a[i - 1] == b[i - 1])
-					continue;
-				else {
-					flag = a[i - 1] < b[i - 1];
-					break;
-				}
+			flag = a.sign ? true : false;
 		return flag;
 	}
 	Num operator+(Num b) { // 重载 +
 		Num res = 0, a = *this;
-		size_t l = max(a.n.size(), b.n.size());
-		while (a.n.size() < l)
-			a.n.push_back(0);
-		while (b.n.size() < l)
-			b.n.push_back(0);
-		for (size_t i = 0; i < l; i++) {
-			res[i] += a[i] + b[i];
-			res.n.push_back(res[i] / 10);
-			res[i] %= 10;
+		if (!(a.sign ^ b.sign)) { // 如果符号相同
+			if (!a.sign)
+				res.sign = 0/*, a.sign = 1, b.sign = 1*/; // 负加负=负的正加正 (-a)+(-b)=-a-b=-(a+b)
+			size_t l = max(a.n.size(), b.n.size());
+			while (a.n.size() < l)
+				a.n.push_back(0);
+			while (b.n.size() < l)
+				b.n.push_back(0);
+			for (size_t i = 0; i < l; i++) {
+				res[i] += a[i] + b[i];
+				res.n.push_back(res[i] / 10);
+				res[i] %= 10;
+			}
+			cz(res);
 		}
-		cz(res);
+		else {
+			if (a.sign)
+				b.sign = 1, res = a - b; // 正加负=正减正
+			else
+				a.sign = 1, res = b - a; // 负（a）加正（b）=正（b）减正（-a）
+		}
 		return res;
 	}
 	Num operator-(Num b) { // 重载 -
 		Num res = 0, a = *this;
-		size_t l = max(a.n.size(), b.n.size());
-		while (a.n.size() < l)
-			a.n.push_back(0);
-		while (b.n.size() < l)
-			b.n.push_back(0);
-		for (size_t i = 0; i < l; i++) {
-			res[i] += a[i] - b[i];
-			res.n.push_back(0);
-			if (res[i] < 0) {
-				res[i] += 10, --res[i + 1];
+		if (!(a.sign ^ b.sign)) { // 如果符号相同
+			if (!a.sign)
+				b.sign = 1, res = a + b; // 负减负=负加正
+			else {
+				if (a <= b) { // 小减大=负的大减小
+					res.sign = 0;
+					Num t = a;
+					a = b;
+					b = t;
+				}
+				size_t l = max(a.n.size(), b.n.size());
+				while (a.n.size() < l)
+					a.n.push_back(0);
+				while (b.n.size() < l)
+					b.n.push_back(0);
+				for (size_t i = 0; i < l; i++) {
+					res[i] += a[i] - b[i];
+					res.n.push_back(0);
+					if (res[i] < 0) {
+						res[i] += 10, --res[i + 1];
+					}
+				}
+				cz(res);
 			}
 		}
-		cz(res);
+		else {
+			if (a.sign)
+				b.sign = 1, res = a + b; // 正减负=正加正
+			else
+				b.sign = 0, res = a + b; // 负减正=负加负
+		}
 		return res;
 	}
 	Num operator*(Num b) { // 重载 *
@@ -88,6 +131,8 @@ struct Num { // 大数
 				res[i + j] %= 10;
 			}
 		cz(res);
+		if (a.sign ^ b.sign) // 如果符号不同
+			res.sign = 0;
 		return res;
 	}
 	Num operator/(Num b) {
@@ -109,13 +154,20 @@ stack<Num> n;
 int pri[300];
 
 ostream& operator<<(ostream& out, Num x) { // 重载输出
+	if (!x.sign)
+		putchar('-');
 	for (size_t i = x.n.size(); i > 0; --i)
-		cout << x[i - 1];
+		putchar(x[i - 1] + '0');
 	return out;
 }
 
 string getNum() { // 获取一段数字的字符串
-	string n;
+	string n = "+";
+	while (expre[p] == '+' || expre[p] == '-') {
+		if (expre[p] == '-')
+			n[0] = n[0] == '+' ? '-' : '+';
+		++p;
+	}
 	while (isdigit(expre[p]))
 		n += expre[p++];
 	return n;
@@ -198,5 +250,5 @@ int main() {
 	}
 	return 0;
 }
-// 45489*531-55-(6+8)+((5*3)^(21-15)+83)*8978954421546
-// 102276647961163549158
+// 45489*-531-55-(6+8)+((5*3)^(21-15)+83)*(89784152345-954654421546)
+// -9851484694374139036
