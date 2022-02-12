@@ -62,20 +62,20 @@ struct Num { // 大数
 	//}
 
 	int& operator[](size_t n) { return this->n[n]; } // 重载数组元素的调用
-	bool operator<=(Num b) { // 重载 <=
+	bool operator>=(Num b) { // 重载 >=
 		bool flag = true;
 		Num a = *this;
 		if (!(a.sign ^ b.sign)) { // 如果符号相同
 			if (!a.sign)
 				flag = false;
 			if (a.n.size() != b.n.size())
-				flag = a.n.size() < b.n.size();
+				flag = a.n.size() > b.n.size();
 			else
 				for (size_t i = a.n.size(); i > 0; i--)
 					if (a[i - 1] == b[i - 1])
 						continue;
 					else {
-						bool tmp = a[i - 1] < b[i - 1];
+						bool tmp = a[i - 1] > b[i - 1];
 						flag = flag ? tmp : !tmp;
 						break;
 					}
@@ -83,6 +83,9 @@ struct Num { // 大数
 		else
 			flag = a.sign ? true : false;
 		return flag;
+	}
+	bool operator<(Num b) { // 重载 >=
+		return !(*this >= b);
 	}
 	Num operator+(Num b) { // 重载 +
 		Num res = 0, a = *this;
@@ -127,7 +130,7 @@ struct Num { // 大数
 			if (!a.sign)
 				b.sign = 1, res = a + b; // 负减负=负加正
 			else {
-				if (a <= b) { // 小减大=负的大减小
+				if (a < b) { // 小减大=负的大减小
 					res.sign = 0;
 					Num t = a;
 					a = b;
@@ -192,7 +195,7 @@ struct Num { // 大数
 	}
 	Num operator^(Num n) { // 重载 ^（用异或表示阶乘）
 		Num res = *this;
-		for (Num i = 2; i <= n; i = i + 1)
+		for (Num i = 1; i < n; i = i + 1)
 			res = res * *this;
 		return res;
 	}
