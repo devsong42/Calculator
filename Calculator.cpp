@@ -8,9 +8,18 @@ using namespace std;
 struct Num { // 大数
 	vector<int> n; // 用数组存储
 	bool sign = 1; // 符号，1 正，0 负
-	void cz(Num& x) { // control zero 控制 0 的数量
-		while (x.n.back() == 0 && x.n.size() > 1)
-			x.n.pop_back();
+	size_t sum = 0; // 小数位数
+	void trim() { // 修剪 0 的数量
+		while (n[0] == 0 && sum > 0) { // 去除小数末尾无效的 0
+			n.erase(n.begin());
+			sum--;
+		}
+
+		while (n.size() > sum + 1 && n.back() == 0) // 去除前导 0
+			n.pop_back();
+
+		while (sum >= n.size()) // 补齐 0
+			n.push_back(0);
 	}
 
 	// 构造函数
@@ -20,9 +29,14 @@ struct Num { // 大数
 				sign = !sign;
 			num.erase(num.begin());
 		}
-		for (size_t i = num.size(); i > 0; --i)
+		for (size_t i = num.size(); i > 0; --i) {
+			if (num[i - 1] == '.') {
+				sum = n.size();
+				continue;
+			}
 			n.push_back(num[i - 1] - '0');
-		cz(*this);
+		}
+		trim();
 	}
 	Num(int num) {
 		if (num < 0)
@@ -34,6 +48,18 @@ struct Num { // 大数
 			num /= 10;
 		}
 	}
+
+	//string ToString() { // 字面
+	//	string str = "";
+	//	if (!sign)
+	//		str += '-';
+	//	for (size_t i = n.size(); i > 0; --i) {
+	//		if (i == sum)
+	//			str += '.';
+	//		str += n[i - 1] + '0';
+	//	}
+	//	return str;
+	//}
 
 	int& operator[](size_t n) { return this->n[n]; } // 重载数组元素的调用
 	bool operator<=(Num b) { // 重载 <=
@@ -63,6 +89,18 @@ struct Num { // 大数
 		if (!(a.sign ^ b.sign)) { // 如果符号相同
 			if (!a.sign)
 				res.sign = 0/*, a.sign = 1, b.sign = 1*/; // 负加负=负的正加正 (-a)+(-b)=-a-b=-(a+b)
+
+		// 对齐数位
+			while (a.sum > b.sum) {
+				b.n.insert(b.n.begin(), 0);
+				b.sum++;
+			}
+			while (b.sum > a.sum) {
+				a.n.insert(a.n.begin(), 0);
+				a.sum++;
+			}
+			res.sum = a.sum;
+
 			size_t l = max(a.n.size(), b.n.size());
 			while (a.n.size() < l)
 				a.n.push_back(0);
@@ -73,7 +111,7 @@ struct Num { // 大数
 				res.n.push_back(res[i] / 10);
 				res[i] %= 10;
 			}
-			cz(res);
+			res.trim();
 		}
 		else {
 			if (a.sign)
@@ -95,6 +133,18 @@ struct Num { // 大数
 					a = b;
 					b = t;
 				}
+
+				// 对齐数位
+				while (a.sum > b.sum) {
+					b.n.insert(b.n.begin(), 0);
+					b.sum++;
+				}
+				while (b.sum > a.sum) {
+					a.n.insert(a.n.begin(), 0);
+					a.sum++;
+				}
+				res.sum = a.sum;
+
 				size_t l = max(a.n.size(), b.n.size());
 				while (a.n.size() < l)
 					a.n.push_back(0);
@@ -107,7 +157,7 @@ struct Num { // 大数
 						res[i] += 10, --res[i + 1];
 					}
 				}
-				cz(res);
+				res.trim();
 			}
 		}
 		else {
@@ -120,6 +170,7 @@ struct Num { // 大数
 	}
 	Num operator*(Num b) { // 重载 *
 		Num res = 0, a = *this;
+		res.sum = a.sum + b.sum;
 		size_t l = a.n.size() + b.n.size();
 		while (res.n.size() < l)
 			res.n.push_back(0);
@@ -130,7 +181,7 @@ struct Num { // 大数
 				res[i + j + 1] += s;
 				res[i + j] %= 10;
 			}
-		cz(res);
+		res.trim();
 		if (a.sign ^ b.sign) // 如果符号不同
 			res.sign = 0;
 		return res;
@@ -145,6 +196,21 @@ struct Num { // 大数
 			res = res * *this;
 		return res;
 	}
+
+	void print() { // 输出自身
+		if (!sign)
+			putchar('-');
+		for (size_t i = n.size(); i > 0; --i) {
+			if (i == sum)
+				putchar('.');
+			putchar(n[i - 1] + '0');
+		}
+	}
+
+	void println() { // 输出并换行
+		print();
+		cout << endl;
+	}
 };
 
 string expre;
@@ -153,14 +219,6 @@ stack<char> op;
 stack<Num> n;
 int pri[300];
 
-ostream& operator<<(ostream& out, Num x) { // 重载输出
-	if (!x.sign)
-		putchar('-');
-	for (size_t i = x.n.size(); i > 0; --i)
-		putchar(x[i - 1] + '0');
-	return out;
-}
-
 string getNum() { // 获取一段数字的字符串
 	string n = "+";
 	while (expre[p] == '+' || expre[p] == '-') {
@@ -168,7 +226,7 @@ string getNum() { // 获取一段数字的字符串
 			n[0] = n[0] == '+' ? '-' : '+';
 		++p;
 	}
-	while (isdigit(expre[p]))
+	while (isdigit(expre[p]) || expre[p] == '.')
 		n += expre[p++];
 	return n;
 }
@@ -245,10 +303,10 @@ int main() {
 		}
 		while (!op.empty()) // 把栈计算干净
 			cal();
-		cout << n.top() << endl;
+		n.top().println();
 		n.pop(); // 垃圾，不要了（bushi
 	}
 	return 0;
 }
-// 45489*-531-55-(6+8)+((5*3)^(21-15)+83)*(89784152345-954654421546)
-// -9851484694374139036
+// 45484.9*-531.3-55-(6+8)+((5*3)^(21-15)+83)*(897841523.45-95465442145.46646)
+// -1077191924970174063.42368
